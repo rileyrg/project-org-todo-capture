@@ -1,0 +1,188 @@
+#+TITLE: project-org-todo-capture
+#+AUTHOR: rileyrg
+#+EMAIL: rileyrg at g m x dot de
+
+#+LANGUAGE: en
+#+STARTUP: showall
+
+#+EXPORT_FILE_NAME: README.md
+#+OPTIONS: toc:8 num:nil
+#+OPTIONS: ^:nil
+
+#+category: project-org-todo-capture
+#+FILETAGS: :elisp:emacs:project:org:todo
+
+#+PROPERTY: header-args:bash :tangle-mode (identity #o755)
+
+
+* Introduction
+
+ Enable todo capture for an Emacs [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Projects.html][project]]. Uses the builtin emacs project infratructure, not [[https://github.com/bbatsov/projectile][projectile]].
+
+ Add a key to Emacs project-prefix-map
+
+#+CAPTION: selecting project TODO from project key map
+#+ATTR_HTML: :width 40% :height 40%
+#+NAME:   fig:1
+[[./images/project-key.png]]
+
+ and  enter a project specific TODO.
+
+#+CAPTION: TODO entry
+#+ATTR_HTML: :width 40% :height 40%
+#+NAME:   fig:2
+[[./images/project-todo-entry.png]]
+
+** core functions
+
+*** project-org-todo-capture
+Create a project TODO item.
+
+*** project-org-todo-capture-file-open
+Open the project TODO file
+
+
+* Installation
+
+Some sample key binds in the examples.
+
+** standard clone or copy
+
+*** getting the code
+
+**** clone the repo :
+
+#+begin_src  bash
+  git clone https://github.com/rileyrg/project-org-todo-capture
+#+end_src
+
+**** copy the code project-org-todo-capture.el
+   link: [[file:project-org-todo-capture.el][project-org-todo-capture.el]]
+
+*** add to loadpath 
+#+begin_src  emacs-lisp 
+(add-to-list 'load-path "where you cloned/copied it to")
+#+end_src
+
+*** require it
+#+begin_src  emacs-lisp
+  (require 'project-org-todo-capture)
+#+end_src
+
+*** bind to it
+#+begin_src  emacs-lisp
+    (define-key project-prefix-map "t" 'project-org-todo-capture)
+#+end_src 
+
+** straight
+#+begin_src emacs-lisp 
+  (use-package project-org-todo-capture
+    :after project
+    :straight (project-org-todo-capture :type git :host github :repo "rileyrg/project-org-todo-capture" )
+      :bind (:map project-prefix-map
+                  (("t" . project-org-todo-capture)
+                  ("T" . project-org-todo-capture-file-open))))
+#+end_src
+
+** elpaca
+#+begin_src emacs-lisp 
+  (use-package project-org-todo-capture
+    :ensure (:host github :repo "rileyrg/project-org-todo-capture" )
+    :bind (:map project-prefix-map
+                  (("t" . project-org-todo-capture)
+                  ("T" . project-org-todo-capture-file-open))))
+#+end_src
+* customisation
+
+** customisable variables
+
+#+begin_src emacs-lisp 
+      (defcustom project-org-todo-capture-template)
+      (defcustom project-org-todo-capture-default-file)
+      (defcustom project-org-todo-capture-auto-append-to-agenda)
+#+end_src
+
+** project specific customisations
+You can change the default TODO org file for a specific project by using  [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Directory-Variables.html][directory local variables]].
+
+eg in file :
+
+#+BEGIN_QUOTE
+$PROJECT_ROOT/.dir-locals.el
+#+END_QUOTE
+
+#+begin_src  emacs-lisp
+    ;;; Directory Local Variables            -*- no-byte-compile: t -*-
+  ;;; For more information see (info "(emacs) Directory Variables")
+
+  ((nil . ((project-org-todo-capture-default-file . "doh.org"))))
+#+end_src
+
+
+** code                                                            :noexport:
+:PROPERTIES:
+:header-args:emacs-lisp: :no-export :tangle project-org-todo-capture.el :tangle-mode (identity #o444)
+:END:
+#+begin_src emacs-lisp 
+  ;;; project-org-todo-capture.el --- Create TODOs for a project
+  ;;
+  ;; maintained in project-org-todo-capture.org
+  ;;
+  ;; Author: rileyrg <rileyrg@gmx.de>
+  ;; Created: 22 January 2025
+  ;; Keywords: org project todo tasks capture
+  ;; Version : 1.1
+  ;; Package-Requires: ((emacs "25.1")
+  ;; Optional :
+  ;; URL: git@github.com/rileyrg/project-org-todo-capture.git
+
+  ;;; commentary:
+  ;;
+  ;; Usage example:
+  ;;       (use-package project-org-todo-capture
+  ;;       :bind (:map project-prefix-map
+  ;;               (("t" . project-org-todo-capture)
+  ;;              (("T" . project-org-todo-capture-file-open)))))
+  ;;
+  ;; customization:
+  ;;   see project-org-todo-capture*
+  ;;
+  ;;; code:
+
+  (require 'project)
+  (require 'org-capture)
+
+
+  (defcustom project-org-todo-capture-template '("p" "Project" entry (file+headline project-org-todo-capture-file  "Project Tasks") "* TODO %?\12:PROPERTIES:\12:DateCreated: %T\12:END:\12%i\12%a") "project todo template")
+  (defcustom project-org-todo-capture-default-file "TODO.org" "default project tasks file. override with .dir-locals.el")
+  (defcustom project-org-todo-capture-auto-append-to-agenda t "When creating a new project todo file, auto  add to agenda files")
+
+
+  (push project-org-todo-capture-template org-capture-templates)
+
+  (defun project-org-todo-capture-file()
+    ;; locate project todo file. create if not found .
+    (let ((l (expand-file-name project-org-todo-capture-default-file (project-root (project-current t)))))
+      ;; create project todo file if it doesnt exist and append to agenda files if  project-org-todo-capture-auto-append-to-agenda is set.
+      (if (or (file-exists-p  l) (write-region "" nil l) t)
+          (progn
+            (when project-org-todo-capture-auto-append-to-agenda
+              (when (not (member l org-agenda-files)) 
+                (with-current-buffer (find-file-noselect l)
+                  (org-agenda-file-to-front))))
+            l)
+        nil)))
+
+  (defun project-org-todo-capture-file-open()
+    "open the project TODO file"
+    (interactive)
+    (find-file (project-org-todo-capture-file)))
+
+
+  (defun project-org-todo-capture()
+    (interactive)
+    (org-capture nil "p"))
+
+  (provide 'project-org-todo-capture)
+
+#+end_src
